@@ -49,13 +49,13 @@ class Main {
 
 	static function clone(remote, local, callback)
 	{
-		ChildProcess.exec('git clone --quiet --mirror "$remote" "$local"', callback);
+		ChildProcess.exec('mkdir -p "$local" && flock -Fx "$local" git clone --quiet --mirror "$remote" "$local"', callback);
 	}
 
 	static function fetch(remote, local, callback)
 	{
-		ChildProcess.exec('git -C "$local" remote set-url origin "$remote"', function(err, stdout, stderr) {
-			ChildProcess.exec('git -C "$local" fetch --quiet --prune --prune-tags', callback);
+		ChildProcess.exec('mkdir -p "$local" && flock -Fx "$local" git -C "$local" remote set-url origin "$remote"', function(err, stdout, stderr) {
+			ChildProcess.exec('mkdir -p "$local" && flock -Fx "$local" git -C "$local" fetch --quiet --prune --prune-tags', callback);
 		});
 	}
 
@@ -163,7 +163,7 @@ class Main {
 						res.setHeader("Content-Type", 'application/x-${params.service}-advertisement');
 						res.setHeader("Cache-Control", "no-cache");
 						res.write("001e# service=git-upload-pack\n0000");
-						var up = ChildProcess.spawn(params.service, ["--stateless-rpc", "--advertise-refs", local]);
+						var up = ChildProcess.spawn("flock", ["-Fs", local, params.service, "--stateless-rpc", "--advertise-refs", local]);
 						up.stdout.pipe(res);
 						up.stderr.on("data", function (data) println('${params.service} stderr: $data'));
 						up.on("exit", function (code) {
@@ -176,7 +176,7 @@ class Main {
 					res.statusCode = 200;
 					res.setHeader("Content-Type", 'application/x-${params.service}-result');
 					res.setHeader("Cache-Control", "no-cache");
-					var up = ChildProcess.spawn(params.service, ["--stateless-rpc", local]);
+					var up = ChildProcess.spawn("flock", ["-Fs", local, params.service, "--stateless-rpc", local]);
                                         // If we receive gzip content, we must unzip
                                         if (req.headers['content-encoding'] == 'gzip')
                                                 req.pipe(Zlib.createUnzip()).pipe(up.stdin);
